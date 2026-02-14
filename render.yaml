@@ -1,0 +1,11 @@
+# Render 배포 설정 (Blueprint)
+# 저장소 연결 후 이 파일이 있으면 서비스가 자동 생성됩니다.
+services:
+  - type: web
+    name: ytaudio
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20

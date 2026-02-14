@@ -1,0 +1,32 @@
+{
+  "name": "youtube-background-audio",
+  "version": "1.0.0",
+  "description": "YouTube 백그라운드 오디오 - 독립 실행 앱",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node server.js",
+    "build": "electron-builder --win",
+    "build:all": "electron-builder -mwl"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.yt.background.audio",
+    "productName": "ytaudio",
+    "directories": { "output": "dist" },
+    "files": ["index.html", "manifest.json", "sw.js", "main.js"],
+    "win": {
+      "target": [{"target": "dir", "arch": ["x64"]}],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}

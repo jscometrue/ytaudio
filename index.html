@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="유튜브 백그라운드 오디오 - 화면 꺼진 상태에서 음성만 재생" />
+  <title>YouTube 백그라운드 오디오</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --accent: #ff0000;
+      --accent-dim: #cc0000;
+      --text: #f1f1f1;
+      --text-dim: #888;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    header {
+      padding: 12px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      flex-shrink: 0;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="text"]::placeholder { color: var(--text-dim); }
+    input[type="text"]:focus { border-color: var(--accent); }
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .player-zone {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      min-height: 0;
+    }
+    /* YouTube 최소 뷰포트 200x200 - 화면 밖에 배치하여 오디오만 사용 */
+    #yt-container {
+      position: fixed;
+      left: -210px;
+      top: 0;
+      width: 200px;
+      height: 200px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+    .now-playing {
+      width: 100%;
+      padding: 16px;
+      background: var(--surface);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .now-playing .title {
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 0 0 4px 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .now-playing .id { font-size: 12px; color: var(--text-dim); margin: 0; }
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .ctrl-btn {
+      width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: 50%;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s, transform .1s;
+    }
+    .ctrl-btn:active { transform: scale(0.95); }
+    .ctrl-btn.play-pause {
+      width: 64px;
+      height: 64px;
+      font-size: 28px;
+      background: var(--accent);
+      color: #fff;
+    }
+    .progress-wrap {
+      width: 100%;
+      padding: 0 8px;
+      margin-bottom: 12px;
+    }
+    .progress-bar {
+      height: 6px;
+      background: rgba(255,255,255,.15);
+      border-radius: 3px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      width: 0%;
+      transition: width .2s;
+    }
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .volume-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 200px;
+    }
+    .volume-wrap input[type="range"] {
+      flex: 1;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255,255,255,.15);
+      border-radius: 3px;
+      outline: none;
+    }
+    .volume-wrap input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .hint {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 0 16px;
+    }
+    .hint a { color: var(--accent); }
+    .mobile-card {
+      width: 100%;
+      max-width: 320px;
+      margin: 16px auto 0;
+      padding: 16px;
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      text-align: center;
+    }
+    .mobile-card h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .mobile-card p {
+      margin: 0 0 12px 0;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .mobile-card .mobile-url {
+      font-size: 13px;
+      word-break: break-all;
+      color: var(--accent);
+      margin-bottom: 12px;
+      padding: 8px;
+      background: rgba(255,0,0,.1);
+      border-radius: 8px;
+    }
+    .mobile-card .qr-wrap {
+      margin-top: 12px;
+    }
+    .mobile-card .qr-wrap img {
+      display: block;
+      margin: 0 auto;
+      border-radius: 8px;
+      max-width: 160px;
+      height: auto;
+    }
+    @media (max-width: 480px) {
+      .mobile-card { display: none !important; }
+    }
+    .search-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+    .search-row input { flex: 1; }
+    .search-results {
+      width: 100%;
+      max-height: 280px;
+      overflow-y: auto;
+      margin-top: 12px;
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .search-results:empty { display: none; }
+    .search-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      cursor: pointer;
+      transition: background .15s;
+      text-align: left;
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover, .search-item:active { background: rgba(255,255,255,.06); }
+    .search-item img {
+      width: 120px;
+      height: 68px;
+      object-fit: cover;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .search-item .info { flex: 1; min-width: 0; }
+    .search-item .info .stitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .search-item .info .channel { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .url-row { margin-top: 10px; }
+    .url-row .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .header-top h1 { flex: 1; }
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-icon:hover { color: var(--text); background: rgba(255,255,255,.08); }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 360px;
+      width: 100%;
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .modal h3 { margin: 0 0 12px 0; font-size: 16px; }
+    .modal p { font-size: 12px; color: var(--text-dim); margin: 0 0 12px 0; }
+    .modal input { width: 100%; margin-bottom: 12px; }
+    .modal .btns { display: flex; gap: 8px; justify-content: flex-end; }
+    .install-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      font-size: 13px;
+    }
+    .install-banner.show { display: flex; }
+    .install-banner .install-btn { flex-shrink: 0; padding: 8px 14px; font-size: 13px; }
+    .search-loading, .search-error { padding: 12px; font-size: 13px; color: var(--text-dim); text-align: center; }
+    .search-error { color: #f44; }
+    .api-key-hint { margin: 6px 0 0 0; font-size: 12px; }
+    .link-btn { background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; font-size: 12px; }
+    .link-btn:hover { color: var(--accent-dim); }
+    .modal-hint { background: rgba(255,0,0,.12); color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 13px; margin-bottom: 10px; }
+    .modal-hint.hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="install-banner" id="installBanner">
+      <span>📱 앱으로 설치하면 더 편하게 사용할 수 있어요</span>
+      <button type="button" class="btn btn-primary install-btn" id="installBtn">설치</button>
+    </div>
+    <header>
+      <div class="header-top">
+        <h1>YouTube 백그라운드 오디오</h1>
+        <button type="button" class="btn-icon" id="settingsBtn" title="설정">⚙️</button>
+      </div>
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="유튜브 검색 (제목, 가수 등)" autocomplete="off" />
+        <button type="button" class="btn btn-primary" id="searchBtn">검색</button>
+      </div>
+      <p class="api-key-hint" id="apiKeyHintRow" style="display:none;"><button type="button" class="link-btn" id="openApiKeyBtn">검색 사용: API 키 설정 (한 번만 입력)</button></p>
+      <div class="url-row">
+        <div class="label">또는 URL / 영상 ID 직접 입력</div>
+        <div class="input-row">
+          <input type="text" id="url" placeholder="유튜브 URL 또는 영상 ID" autocomplete="off" />
+          <button type="button" class="btn btn-primary" id="loadBtn">재생</button>
+        </div>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </header>
+    <main class="player-zone">
+      <div id="yt-container"></div>
+      <div class="now-playing" id="nowPlaying" style="display:none">
+        <p class="title" id="videoTitle">—</p>
+        <p class="id" id="videoId">—</p>
+      </div>
+      <div class="controls" id="controls" style="display:none">
+        <button type="button" class="ctrl-btn" id="prevBtn" title="이전">⏮</button>
+        <button type="button" class="ctrl-btn play-pause" id="playPauseBtn" title="재생/일시정지">▶</button>
+        <button type="button" class="ctrl-btn" id="nextBtn" title="다음">⏭</button>
+      </div>
+      <div class="progress-wrap" id="progressWrap" style="display:none">
+        <div class="progress-bar" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="time-labels">
+          <span id="currentTime">0:00</span>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
+      <div class="volume-wrap" id="volumeWrap" style="display:none">
+        <span style="font-size:18px">🔊</span>
+        <input type="range" id="volume" min="0" max="100" value="100" />
+      </div>
+    </main>
+    <div class="mobile-card" id="mobileCard" style="display:none">
+      <h3>📱 모바일에서 접속</h3>
+      <p>같은 Wi‑Fi에서 아래 주소로 접속하거나 QR 코드를 스캔하세요.</p>
+      <div class="mobile-url" id="mobileUrl"></div>
+      <div class="qr-wrap"><img id="qrImg" src="" alt="QR" /></div>
+    </div>
+    <p class="hint">
+      PC: 창 최소화 또는 다른 탭으로 가도 소리만 재생됩니다.<br />
+      모바일: 앱 설치 후 홈 화면에서 실행 · 잠금 화면에서도 재생/일시정지 가능합니다.
+    </p>
+  </div>
+
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal">
+      <h3>설정</h3>
+      <p id="settingsDesc">YouTube 검색을 사용하려면 Google에서 발급한 API 키가 필요합니다. <strong>무료</strong>이며, 하루 약 100회 검색까지 무료 할당량으로 사용 가능합니다. (한 번만 입력)</p>
+      <p class="modal-hint hidden" id="apiKeyRequiredHint">아래에 API 키를 입력한 뒤 <strong>저장</strong>을 누르면 검색을 사용할 수 있습니다.</p>
+      <input type="text" id="apiKeyInput" placeholder="YouTube Data API v3 키 (여기에 붙여넣기)" autocomplete="off" />
+      <p style="font-size:11px; margin-top: -6px;">
+        <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a>에서 YouTube Data API v3 사용 설정 후 API 키 생성
+      </p>
+      <div class="btns">
+        <button type="button" class="btn" id="settingsCloseBtn" style="background:var(--surface); color:var(--text);">취소</button>
+        <button type="button" class="btn btn-primary" id="settingsSaveBtn">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const urlInput = document.getElementById('url');
+      const loadBtn = document.getElementById('loadBtn');
+      const nowPlaying = document.getElementById('nowPlaying');
+      const videoTitle = document.getElementById('videoTitle');
+      const videoIdEl = document.getElementById('videoId');
+      const controls = document.getElementById('controls');
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const progressWrap = document.getElementById('progressWrap');
+      const progressBar = document.getElementById('progressBar');
+      const progressFill = document.getElementById('progressFill');
+      const currentTimeEl = document.getElementById('currentTime');
+      const durationEl = document.getElementById('duration');
+      const volumeInput = document.getElementById('volume');
+      const volumeWrap = document.getElementById('volumeWrap');
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const searchResults = document.getElementById('searchResults');
+      const API_KEY_STORAGE = 'yt_api_key';
+
+      function getApiKey() { return localStorage.getItem(API_KEY_STORAGE) || ''; }
+      function setApiKey(key) { localStorage.setItem(API_KEY_STORAGE, (key || '').trim()); }
+
+      function parseVideoId(input) {
+        const v = (input || '').trim();
+        const m1 = v.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (m1) return m1[1];
+        if (/^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+        return null;
+      }
+
+      function formatTime(s) {
+        if (!s || isNaN(s)) return '0:00';
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60);
+        return m + ':' + (sec < 10 ? '0' : '') + sec;
+      }
+
+      let player = null;
+      let pollTimer = null;
+
+      function updateMediaSession(title, videoId) {
+        if (!navigator.mediaSession) return;
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: title || 'YouTube',
+          artist: 'YouTube',
+          artwork: [{ src: 'https://i.ytimg.com/vi/' + videoId + '/mqdefault.jpg', sizes: '320x180', type: 'image/jpeg' }]
+        });
+        navigator.mediaSession.setActionHandler('play', () => player && player.playVideo());
+        navigator.mediaSession.setActionHandler('pause', () => player && player.pauseVideo());
+        navigator.mediaSession.setActionHandler('previoustrack', () => player && typeof player.previousVideo === 'function' && player.previousVideo());
+        navigator.mediaSession.setActionHandler('nexttrack', () => player && typeof player.nextVideo === 'function' && player.nextVideo());
+        navigator.mediaSession.setActionHandler('seekbackward', () => seekRelative(-10));
+        navigator.mediaSession.setActionHandler('seekforward', () => seekRelative(10));
+      }
+
+      function seekRelative(sec) {
+        if (!player) return;
+        try {
+          const t = player.getCurrentTime();
+          player.seekTo(Math.max(0, t + sec), true);
+        } catch (e) {}
+      }
+
+      function updateProgress() {
+        if (!player) return;
+        try {
+          const state = player.getPlayerState();
+          const current = player.getCurrentTime();
+          const duration = player.getDuration();
+          if (state === 1) {
+            currentTimeEl.textContent = formatTime(current);
+            const p = duration > 0 ? (current / duration) * 100 : 0;
+            progressFill.style.width = p + '%';
+          }
+          if (duration && !isNaN(duration)) durationEl.textContent = formatTime(duration);
+        } catch (e) {}
+      }
+
+      function startPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(updateProgress, 500);
+      }
+
+      function stopPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+      }
+
+      function onPlayerReady(event) {
+        player = event.target;
+        try {
+          player.setVolume(parseInt(volumeInput.value, 10));
+        } catch (e) {}
+        updateProgress();
+        startPolling();
+        if (navigator.mediaSession) {
+          navigator.mediaSession.playbackState = 'playing';
+        }
+      }
+
+      function onPlayerStateChange(event) {
+        if (event.data === 1) {
+          playPauseBtn.textContent = '⏸';
+          startPolling();
+          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing';
+        } else if (event.data === 2 || event.data === 0) {
+          playPauseBtn.textContent = '▶';
+          if (event.data === 0) stopPolling();
+          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused';
+        }
+        updateProgress();
+      }
+
+      function initPlayer(videoId) {
+        if (player && player.destroy) player.destroy();
+        stopPolling();
+        const container = document.getElementById('yt-container');
+        container.innerHTML = '';
+
+        window.onYouTubeIframeAPIReady = function () {
+          player = new YT.Player(container, {
+            height: 200,
+            width: 200,
+            videoId: videoId,
+            playerVars: {
+              autoplay: 1,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              modestbranding: 1,
+              playsinline: 1,
+              rel: 0
+            },
+            events: {
+              onReady: onPlayerReady,
+              onStateChange: onPlayerStateChange
+            }
+          });
+        };
+
+        if (window.YT && window.YT.Player) {
+          window.onYouTubeIframeAPIReady();
+          return;
+        }
+
+        if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+          const tag = document.createElement('script');
+          tag.src = 'https://www.youtube.com/iframe_api';
+          document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
+        }
+      }
+
+      function showPlayerUI(id, title) {
+        nowPlaying.style.display = 'block';
+        videoTitle.textContent = title || '재생 중';
+        videoTitle.title = title || '';
+        videoIdEl.textContent = id || '';
+        controls.style.display = 'flex';
+        progressWrap.style.display = 'block';
+        volumeWrap.style.display = 'flex';
+        updateMediaSession(title, id);
+      }
+
+      function loadVideoById(id, title) {
+        initPlayer(id);
+        showPlayerUI(id, title || '로딩 중…');
+        searchResults.innerHTML = '';
+      }
+
+      loadBtn.addEventListener('click', function () {
+        const id = parseVideoId(urlInput.value);
+        if (!id) {
+          alert('유효한 유튜브 URL 또는 영상 ID를 입력하세요.');
+          return;
+        }
+        loadVideoById(id, '로딩 중…');
+      });
+
+      function openSettingsForApiKey() {
+        apiKeyInput.value = getApiKey();
+        var hint = document.getElementById('apiKeyRequiredHint');
+        if (hint) hint.classList.remove('hidden');
+        settingsModal.classList.remove('hidden');
+        setTimeout(function () { apiKeyInput.focus(); }, 100);
+      }
+      function closeSettingsHint() {
+        var hint = document.getElementById('apiKeyRequiredHint');
+        if (hint) hint.classList.add('hidden');
+      }
+      function updateApiKeyHintVisibility() {
+        var row = document.getElementById('apiKeyHintRow');
+        if (row) row.style.display = getApiKey() ? 'none' : 'block';
+      }
+      updateApiKeyHintVisibility();
+
+      searchBtn.addEventListener('click', function doSearch() {
+        const q = (searchInput.value || '').trim();
+        if (!q) { searchInput.focus(); return; }
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          openSettingsForApiKey();
+          return;
+        }
+        searchResults.innerHTML = '<div class="search-loading">검색 중…</div>';
+        var url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=15&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(apiKey);
+        fetch(url)
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            searchResults.innerHTML = '';
+            if (data.error) {
+              searchResults.innerHTML = '<div class="search-error">' + (data.error.message || '검색 오류') + '</div>';
+              return;
+            }
+            var items = data.items || [];
+            if (items.length === 0) {
+              searchResults.innerHTML = '<div class="search-loading">검색 결과가 없습니다.</div>';
+              return;
+            }
+            items.forEach(function (item) {
+              var id = item.id && item.id.videoId;
+              if (!id) return;
+              var sn = item.snippet || {};
+              var thumb = (sn.thumbnails && (sn.thumbnails.medium || sn.thumbnails.default)) || {};
+              var div = document.createElement('div');
+              div.className = 'search-item';
+              div.innerHTML = '<img src="' + (thumb.url || '').replace(/"/g, '&quot;') + '" alt="" /><div class="info"><div class="stitle">' + (sn.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><div class="channel">' + (sn.channelTitle || '').replace(/</g, '&lt;') + '</div></div>';
+              div.addEventListener('click', function () { loadVideoById(id, sn.title); });
+              searchResults.appendChild(div);
+            });
+          })
+          .catch(function (err) {
+            searchResults.innerHTML = '<div class="search-error">검색 실패. API 키를 확인해 주세요.</div>';
+          });
+      });
+      searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') searchBtn.click(); });
+
+      var settingsModal = document.getElementById('settingsModal');
+      var apiKeyInput = document.getElementById('apiKeyInput');
+      document.getElementById('settingsBtn').addEventListener('click', function () {
+        closeSettingsHint();
+        apiKeyInput.value = getApiKey();
+        settingsModal.classList.remove('hidden');
+      });
+      document.getElementById('openApiKeyBtn').addEventListener('click', openSettingsForApiKey);
+      document.getElementById('settingsCloseBtn').addEventListener('click', function () { settingsModal.classList.add('hidden'); closeSettingsHint(); });
+      document.getElementById('settingsSaveBtn').addEventListener('click', function () {
+        setApiKey(apiKeyInput.value);
+        settingsModal.classList.add('hidden');
+        closeSettingsHint();
+        updateApiKeyHintVisibility();
+        var q = (searchInput.value || '').trim();
+        if (q && getApiKey()) searchBtn.click();
+      });
+      settingsModal.addEventListener('click', function (e) { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
+
+      var installBanner = document.getElementById('installBanner');
+      var installBtn = document.getElementById('installBtn');
+      var deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (installBanner && !window.matchMedia('(display-mode: standalone)').matches) installBanner.classList.add('show');
+      });
+      window.addEventListener('appinstalled', function () { deferredPrompt = null; if (installBanner) installBanner.classList.remove('show'); });
+      if (installBtn) installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function (r) { if (r.outcome === 'accepted') deferredPrompt = null; });
+      });
+      if (window.matchMedia('(display-mode: standalone)').matches && installBanner) installBanner.classList.remove('show');
+
+      playPauseBtn.addEventListener('click', function () {
+        if (!player) return;
+        try {
+          const state = player.getPlayerState();
+          if (state === 1) player.pauseVideo();
+          else player.playVideo();
+        } catch (e) {}
+      });
+
+      prevBtn.addEventListener('click', function () {
+        if (player) try { player.previousVideo(); } catch (e) {}
+      });
+
+      nextBtn.addEventListener('click', function () {
+        if (player) try { player.nextVideo(); } catch (e) {}
+      });
+
+      progressBar.addEventListener('click', function (e) {
+        if (!player) return;
+        const rect = progressBar.getBoundingClientRect();
+        const p = (e.clientX - rect.left) / rect.width;
+        try {
+          const dur = player.getDuration();
+          if (dur) player.seekTo(dur * p, true);
+        } catch (err) {}
+      });
+
+      volumeInput.addEventListener('input', function () {
+        const v = parseInt(this.value, 10);
+        if (player) try { player.setVolume(v); } catch (e) {}
+      });
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
+
+      // 모바일 접속 안내 (PC에서 서버로 접속했을 때만 표시)
+      fetch('/api/mobile-url').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+        if (!data || !data.url) return;
+        var card = document.getElementById('mobileCard');
+        var urlEl = document.getElementById('mobileUrl');
+        var qrImg = document.getElementById('qrImg');
+        if (!card || !urlEl || !qrImg) return;
+        urlEl.textContent = data.url;
+        qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(data.url);
+        card.style.display = 'block';
+      }).catch(function () {});
+    })();
+  </script>
+</body>
+</html>
