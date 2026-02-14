@@ -4,7 +4,7 @@ services:
   - type: web
     name: ytaudio
     runtime: node
-    buildCommand: npm install
+    buildCommand: npm install --omit=dev
     startCommand: node server.js
     envVars:
       - key: NODE_VERSION

@@ -106,7 +106,7 @@ PC와 모바일에서 **화면을 끈 상태에서 유튜브 음성만** 들을 
 |------|--------|------|
 | **1** | **Render 가입** | [render.com](https://render.com) → **Get Started** → 이메일·비밀번호 또는 GitHub으로 가입. 결제 수단 없이 무료 플랜 사용 가능. |
 | **2** | **GitHub 가입** | 아직 없다면 [github.com](https://github.com)에서 가입. Render가 코드를 가져올 저장소가 필요함. |
-| **3** | **프로젝트 폴더 확인** | **로컬 PC**에서 이 프로그램이 들어 있는 폴더(예: `c:\Cursor\YouTube`)를 열고, 그 안에 `index.html`, `manifest.json`, `sw.js`, `server.js`, `package.json`, `render.yaml` 이 있는지 확인. |
+| **3** | **프로젝트 폴더 확인** | **로컬 PC**의 **YouTube 폴더**(예: `c:\Cursor\YouTube`)가 곧 프로젝트 폴더입니다. 그 폴더를 열고, 안에 `index.html`, `manifest.json`, `sw.js`, `server.js`, `package.json`, `render.yaml` 이 있는지 확인. |
 | **4** | **Git 설치** | **로컬 PC**에 Git이 없다면 [git-scm.com](https://git-scm.com) 에서 다운로드 후 설치. 설치 후 터미널에서 `git --version` 입력해 설치 여부 확인. |
 | **5** | **GitHub 저장소 만들기** | **(Git 설치 다음 단계)** GitHub 로그인 → 우측 상단 **+** → **New repository** → 저장소 이름 입력(예: `ytaudio`) → **Create repository**. (README 추가 안 해도 됨) |
 | **6** | **코드를 GitHub에 올리기** | **같은 로컬 폴더**에서 터미널(또는 PowerShell)을 열고 아래 명령 실행. (저장소 주소는 본인 것으로 바꿀 것) |
@@ -163,7 +163,17 @@ PowerShell을 **관리자 권한**으로 연 뒤 아래를 **한 줄씩** 실행
 
 ### 6단계: 터미널에서 실행할 명령
 
-프로젝트 폴더 경로에서 실행 (예: `c:\Cursor\YouTube`).
+**먼저 Git 사용자 정보 설정 (최초 1회)**  
+`git commit` 시 "Please tell me who you are" 가 나오면, 아래를 **본인 정보**로 바꿔 실행한 뒤 다시 `git commit` 하세요.
+
+```bash
+git config --global user.name "본인이름"
+git config --global user.email "본인이메일@example.com"
+```
+
+예: `git config --global user.name "Hong Gildong"` , `git config --global user.email "hong@gmail.com"`
+
+**이후 프로젝트 폴더**(YouTube 폴더)에서:
 
 ```bash
 git init
@@ -174,7 +184,13 @@ git remote add origin https://github.com/당신아이디/저장소이름.git
 git push -u origin main
 ```
 
-- **당신아이디** · **저장소이름** 을 5단계에서 만든 GitHub 저장소에 맞게 바꾸세요.
+**git commit 다음 할 일 (같은 6단계):**  
+① `git branch -M main` → ② `git remote add origin (저장소URL)` → ③ `git push -u origin main`  
+(저장소 URL은 GitHub에서 만든 저장소 페이지의 **Code** 버튼에서 복사)
+
+**git push 다음 할 일 (7단계):** Render 대시보드에서 Web Service 생성 → 아래 "7단계: Render 설정 값" 참고.
+
+- **당신아이디**: GitHub 로그인 아이디. **저장소이름**: 5단계에서 New repository 만들 때 입력한 이름(예: `ytaudio`). 둘 다 본인 GitHub 저장소에 맞게 바꾸세요.
 - GitHub 최초 푸시 시 로그인 창이 뜨면 로그인하거나, **Personal Access Token**을 비밀번호 자리에 넣어야 할 수 있습니다.
 
 ### 7단계: Render 설정 값
@@ -191,10 +207,78 @@ git push -u origin main
 
 **Create Web Service** 클릭 후 배포가 시작됩니다.
 
-### 배포 후
+### Render 빌드가 끝나면 (다음 할 일)
 
-- 상단에 나오는 **URL**(예: `https://ytaudio.onrender.com`)로 PC·모바일에서 접속해 사용하면 됩니다.
+| 순서 | 할 일 |
+|------|--------|
+| 1 | Render 대시보드에서 **상단에 표시된 URL** 확인 (예: `https://ytaudio.onrender.com`) |
+| 2 | **PC**: 브라우저에서 해당 URL 열어서 앱이 정상 열리는지 확인 |
+| 3 | **URL 저장**: 주소창 주소를 북마크하거나 메모해 두기 (나중에 접속할 때 사용) |
+| 4 | **모바일**: 같은 URL을 휴대폰 브라우저에 입력해 접속 → 필요하면 **홈 화면에 추가**로 앱처럼 사용 |
+| 5 | (선택) 코드 수정 후 다시 배포하려면 로컬에서 `git add .` → `git commit -m "메시지"` → `git push` 하면 Render가 자동으로 다시 빌드·배포함 |
+
 - 무료 플랜은 **15분 동안 접속이 없으면** 서버가 잠들고, 다음 접속 시 **최대 1분** 정도 뒤에 다시 켜집니다.
+
+### Render 빌드 오류가 날 때
+
+**"Running 'node main.js'" 로 실패하는 경우**
+
+- **원인**: Start Command가 `node main.js` 로 되어 있음. `main.js`는 **Electron(PC 앱)** 용이라 서버(Render)에서는 동작하지 않음. 서버는 **`node server.js`** 로 실행해야 함.
+- **조치**: Render 대시보드 → 해당 서비스 → **Settings** → **Start Command** 를 **`node server.js`** 로 바꾼 뒤 **Save** → **Manual Deploy** → **Deploy latest commit**.
+
+**그 외 빌드 실패**
+
+- **조치 1**: **Build Command** 를 `npm install --omit=dev` 로 설정 (Electron 제외).
+- **조치 2**: **Start Command** 가 반드시 **`node server.js`** 인지 확인.
+- **그래도 실패하면**: **Logs** 탭의 에러 메시지 확인.
+
+## 향후 프로그램 업데이트 절차
+
+### 수정 내용을 배포에 적용하는 순서 (한눈에)
+
+| 순서 | 할 일 |
+|------|--------|
+| 1 | **로컬에서 파일 수정** (예: `index.html`, `server.js` 등) |
+| 2 | **YouTube 폴더**에서 **`update-render.bat`** 더블클릭 (또는 아래 수동 명령 실행) |
+| 3 | 나오는 창에서 **커밋 메시지** 입력 (예: `검색 최신순 적용`) 후 Enter, 또는 그냥 Enter로 기본 메시지 사용 |
+| 4 | 푸시가 끝날 때까지 대기 |
+| 5 | **Render**가 자동으로 재빌드·재배포 (몇 분 소요). 대시보드 **Logs**에서 상태 확인 |
+| 6 | 같은 **접속 URL**로 들어가 수정 반영 여부 확인 |
+
+**수동으로 할 때:** 2단계 대신 터미널에서 `git add .` → `git commit -m "메시지"` → `git push` 실행.
+
+### Render(웹) 업데이트 (상세)
+
+**간단 방법 – 배치 파일 사용**  
+YouTube 폴더에 **`update-render.bat`** 이 있습니다. 수정 후 이 파일을 **더블클릭**하면 `git add` → `git commit` → `git push` 가 순서대로 실행되어 Render에 자동 반영됩니다. 실행 시 커밋 메시지를 입력하거나 Enter만 눌러 기본 메시지(`Update`)로 올릴 수 있습니다.
+
+**수동 실행 시**
+
+| 순서 | 할 일 |
+|------|--------|
+| 1 | **로컬에서 수정** – YouTube 폴더의 `index.html`, `server.js` 등 원하는 파일 편집 |
+| 2 | **터미널**을 프로젝트 폴더(YouTube)에서 연다 |
+| 3 | `git add .` |
+| 4 | `git commit -m "업데이트 내용 요약"` (예: `git commit -m "검색 UI 개선"`) |
+| 5 | `git push` |
+| 6 | **Render**가 자동으로 새 커밋을 감지해 **재빌드·재배포**함. 대시보드 **Logs**에서 진행 상황 확인 |
+| 7 | 배포가 끝나면 **같은 URL**로 접속 시 수정된 내용이 반영됨 |
+
+(자동 배포가 꺼져 있다면 Render 대시보드에서 **Manual Deploy** → **Deploy latest commit** 실행)
+
+### PC용 exe(ytaudio.exe) 다시 만들기
+
+코드 수정 후 **실행 파일만 새로 만들고 싶을 때**:
+
+1. 로컬에서 수정 후 (위 1~5 단계로 `git push` 까지 해도 됨)
+2. 같은 폴더에서 터미널 실행: `npm run build`
+3. **`dist\win-unpacked\ytaudio.exe`** 가 새로 생성됨. 이 폴더 전체를 배포용으로 사용
+
+### 정리
+
+- **웹(Render)만 업데이트** → 로컬 수정 → `git add .` → `git commit -m "메시지"` → `git push`
+- **exe만 다시 만들기** → `npm run build` 후 `dist\win-unpacked` 사용
+- **둘 다** → 수정 후 `git push` 하고, PC용이 필요하면 `npm run build` 추가로 실행
 
 ## 개인용 무료 클라우드·호스팅 (이 앱 배포용)
 

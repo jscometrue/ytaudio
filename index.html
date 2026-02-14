@@ -290,8 +290,7 @@
       -webkit-box-orient: vertical;
     }
     .search-item .info .channel { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-    .url-row { margin-top: 10px; }
-    .url-row .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+    .search-item .info .date { font-size: 1.05rem; font-weight: 700; color: var(--accent); margin-top: 4px; }
     .header-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .header-top h1 { flex: 1; }
     .btn-icon {
@@ -369,13 +368,6 @@
         <button type="button" class="btn btn-primary" id="searchBtn">검색</button>
       </div>
       <p class="api-key-hint" id="apiKeyHintRow" style="display:none;"><button type="button" class="link-btn" id="openApiKeyBtn">검색 사용: API 키 설정 (한 번만 입력)</button></p>
-      <div class="url-row">
-        <div class="label">또는 URL / 영상 ID 직접 입력</div>
-        <div class="input-row">
-          <input type="text" id="url" placeholder="유튜브 URL 또는 영상 ID" autocomplete="off" />
-          <button type="button" class="btn btn-primary" id="loadBtn">재생</button>
-        </div>
-      </div>
       <div class="search-results" id="searchResults"></div>
     </header>
     <main class="player-zone">
@@ -411,7 +403,7 @@
     </div>
     <p class="hint">
       PC: 창 최소화 또는 다른 탭으로 가도 소리만 재생됩니다.<br />
-      모바일: 앱 설치 후 홈 화면에서 실행 · 잠금 화면에서도 재생/일시정지 가능합니다.
+      모바일: <strong>앱으로 설치</strong>한 뒤 실행하면 화면을 꺼도 백그라운드에서 재생됩니다. 잠금 화면에서 재생/일시정지 가능.
     </p>
   </div>
 
@@ -433,8 +425,6 @@
 
   <script>
     (function () {
-      const urlInput = document.getElementById('url');
-      const loadBtn = document.getElementById('loadBtn');
       const nowPlaying = document.getElementById('nowPlaying');
       const videoTitle = document.getElementById('videoTitle');
       const videoIdEl = document.getElementById('videoId');
@@ -604,15 +594,6 @@
         searchResults.innerHTML = '';
       }
 
-      loadBtn.addEventListener('click', function () {
-        const id = parseVideoId(urlInput.value);
-        if (!id) {
-          alert('유효한 유튜브 URL 또는 영상 ID를 입력하세요.');
-          return;
-        }
-        loadVideoById(id, '로딩 중…');
-      });
-
       function openSettingsForApiKey() {
         apiKeyInput.value = getApiKey();
         var hint = document.getElementById('apiKeyRequiredHint');
@@ -639,7 +620,7 @@
           return;
         }
         searchResults.innerHTML = '<div class="search-loading">검색 중…</div>';
-        var url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=15&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(apiKey);
+        var url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=15&order=date&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(apiKey);
         fetch(url)
           .then(function (r) { return r.json(); })
           .then(function (data) {
@@ -653,14 +634,23 @@
               searchResults.innerHTML = '<div class="search-loading">검색 결과가 없습니다.</div>';
               return;
             }
+            function formatDate(publishedAt) {
+              if (!publishedAt) return '';
+              var d = new Date(publishedAt);
+              var y = d.getFullYear();
+              var m = String(d.getMonth() + 1).padStart(2, '0');
+              var day = String(d.getDate()).padStart(2, '0');
+              return y + '.' + m + '.' + day;
+            }
             items.forEach(function (item) {
               var id = item.id && item.id.videoId;
               if (!id) return;
               var sn = item.snippet || {};
               var thumb = (sn.thumbnails && (sn.thumbnails.medium || sn.thumbnails.default)) || {};
+              var dateStr = formatDate(sn.publishedAt);
               var div = document.createElement('div');
               div.className = 'search-item';
-              div.innerHTML = '<img src="' + (thumb.url || '').replace(/"/g, '&quot;') + '" alt="" /><div class="info"><div class="stitle">' + (sn.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><div class="channel">' + (sn.channelTitle || '').replace(/</g, '&lt;') + '</div></div>';
+              div.innerHTML = '<img src="' + (thumb.url || '').replace(/"/g, '&quot;') + '" alt="" /><div class="info"><div class="stitle">' + (sn.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><div class="channel">' + (sn.channelTitle || '').replace(/</g, '&lt;') + '</div><div class="date">' + (dateStr || '').replace(/</g, '&lt;') + '</div></div>';
               div.addEventListener('click', function () { loadVideoById(id, sn.title); });
               searchResults.appendChild(div);
             });
