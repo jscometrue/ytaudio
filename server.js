@@ -4,9 +4,11 @@
  * → PC: http://localhost:3000  |  모바일: 같은 Wi-Fi에서 QR 스캔 또는 주소 입력
  */
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
@@ -39,17 +41,48 @@ const mime = {
 };
 
 const server = http.createServer((req, res) => {
-  const url = req.url === '/' ? '/index.html' : req.url;
+  const reqUrl = req.url === '/' ? '/index.html' : req.url;
+  const parsed = url.parse(req.url, true);
+  const pathname = parsed.pathname;
 
   // 모바일 접속용 주소 API
-  if (url === '/api/mobile-url' || url === '/api/mobile-url/') {
+  if (pathname === '/api/mobile-url' || pathname === '/api/mobile-url/') {
     const mobileUrl = getBaseUrl();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ url: mobileUrl }));
     return;
   }
 
-  const filePath = path.join(ROOT, path.normalize(url).replace(/^(\.\.(\/|\\|$))+/, ''));
+  // 검색 API (서버에서만 API 키 사용)
+  if (pathname === '/api/search') {
+    const q = (parsed.query && parsed.query.q) || '';
+    const apiKey = process.env.YOUTUBE_API_KEY || '';
+    if (!apiKey) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API key not configured on server. Set YOUTUBE_API_KEY.' }));
+      return;
+    }
+    if (!q.trim()) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing query (q)' }));
+      return;
+    }
+    const apiUrl = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=15&order=date&q=' + encodeURIComponent(q.trim()) + '&key=' + encodeURIComponent(apiKey);
+    https.get(apiUrl, (apiRes) => {
+      let body = '';
+      apiRes.on('data', (chunk) => { body += chunk; });
+      apiRes.on('end', () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(body);
+      });
+    }).on('error', () => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Search request failed' }));
+    });
+    return;
+  }
+
+  const filePath = path.join(ROOT, path.normalize(reqUrl.split('?')[0]).replace(/^(\.\.(\/|\\|$))+/, ''));
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403);
     res.end();

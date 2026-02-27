@@ -56,10 +56,9 @@ PC와 모바일에서 **화면을 끈 상태에서 유튜브 음성만** 들을 
 
 ## 기능
 
-- **유튜브 검색**: 검색어 입력 후 결과에서 곡을 선택하면 URL 없이 바로 재생 (검색 사용 시 API 키 필요, 설정에서 입력)
+- **유튜브 검색**: 검색어 입력 후 결과에서 곡을 선택하면 URL 없이 바로 재생 (서버에 API 키 설정 시 사용 가능)
 - **PC**: 창 최소화·다른 탭으로 가도 오디오만 재생
 - **모바일**: 앱 설치 후 홈 화면에서 실행 · 잠금 화면에서 재생/일시정지
-- URL 또는 영상 ID 직접 입력으로도 재생 가능
 - 재생/일시정지, 구간 이동, 볼륨, 미디어 세션(잠금 화면 정보)
 
 ## 파일 구성
@@ -204,8 +203,9 @@ git push -u origin main
 | **Build Command** | `npm install` |
 | **Start Command** | `node server.js` |
 | **Instance Type** | **Free** |
+| **Environment** | **Key** `YOUTUBE_API_KEY` / **Value** (본인 YouTube Data API v3 키) — 검색 사용 시 필수 |
 
-**Create Web Service** 클릭 후 배포가 시작됩니다.
+**Create Web Service** 클릭 후, **Environment** 섹션에서 **Add Environment Variable** → Key: `YOUTUBE_API_KEY`, Value: (Google Cloud에서 발급한 API 키) 입력 후 **Save** 하면 검색이 동작합니다. (키는 서버에만 저장되며 사용자에게 노출되지 않습니다.)
 
 ### Render 빌드가 끝나면 (다음 할 일)
 
@@ -305,36 +305,28 @@ YouTube 폴더에 **`update-render.bat`** 이 있습니다. 수정 후 이 파�
 
 (각 서비스의 무료 한도·정책은 사이트에서 최신 내용을 확인하세요.)
 
-## 검색 기능 (YouTube API 키)
+## 검색 기능 (서버 API 키)
 
-검색을 사용하려면 **설정(⚙️)** 에서 **YouTube Data API v3** 키를 한 번 입력해 저장하면 됩니다.
+검색은 **서버에서만** YouTube API 키를 사용합니다. 사용자는 키를 입력하지 않으며, **서버 관리자**가 환경 변수 **`YOUTUBE_API_KEY`** 로 키를 한 번만 설정하면, 같은 서버를 쓰는 모든 사용자가 검색을 사용할 수 있습니다. (키가 브라우저에 노출되지 않음)
 
-**API 키 비용:** **무료**입니다.  
-Google에서 하루 **약 1만 단위**를 무료로 제공하며, 검색 1회 = 100 단위라 **하루 약 100번 검색**까지 무료입니다. 개인 사용이라면 유료 결제 없이 사용할 수 있고, 결제 수단 등록 없이도 키 발급·사용이 가능합니다. (초과 시에만 유료 전환 가능)
+**API 키 비용:** **무료** (하루 약 100회 검색까지 무료 할당량).
 
-### 사이트에서 API 키 발급 방법
+### 서버에 API 키 설정 방법
 
-1. **Google Cloud Console 접속**  
-   브라우저에서 **[https://console.cloud.google.com](https://console.cloud.google.com)** 접속 후, Google 계정으로 로그인합니다.
+**Render 사용 시**  
+1. Render 대시보드 → 해당 서비스 → **Environment**  
+2. **Add Environment Variable** → **Key**: `YOUTUBE_API_KEY`, **Value**: (Google Cloud에서 발급한 YouTube Data API v3 키)  
+3. **Save** 후 재배포되면 검색 사용 가능
 
-2. **프로젝트 만들기(또는 선택)**  
-   - 상단 **프로젝트 선택** 클릭 → **새 프로젝트** → 이름 입력(예: `ytaudio`) → **만들기**  
-   - 이미 만든 프로젝트가 있으면 해당 프로젝트를 선택해도 됩니다.
+**로컬에서 server.js 실행 시 (예: start.bat)**  
+- Windows: 터미널에서 `set YOUTUBE_API_KEY=여기에키입력` 후 `node server.js` 실행  
+- 또는 [Google Cloud Console](https://console.cloud.google.com/apis/credentials)에서 API 키 발급 후 위처럼 환경 변수로 설정
 
-3. **YouTube Data API v3 사용 설정**  
-   - 왼쪽 메뉴 **API 및 서비스** → **라이브러리**  
-   - 검색창에 **YouTube Data API v3** 입력 → **YouTube Data API v3** 선택  
-   - **사용** 버튼 클릭
+### API 키 발급 (Google Cloud)
 
-4. **API 키 만들기**  
-   - 왼쪽 메뉴 **API 및 서비스** → **사용자 인증 정보**  
-   - **+ 사용자 인증 정보 만들기** → **API 키** 선택  
-   - 생성된 API 키가 팝업에 표시됩니다. **복사** 버튼으로 키를 복사합니다.
-
-5. **앱에 키 입력**  
-   - ytaudio 앱에서 **⚙️ 설정** 클릭 → **API 키** 입력란에 복사한 키 붙여넣기 → **저장**
-
-(키는 기기 브라우저 저장소에만 저장되며, 검색 요청 시에만 사용됩니다.)
+1. [Google Cloud Console](https://console.cloud.google.com) → 프로젝트 선택 또는 생성  
+2. **API 및 서비스** → **라이브러리** → **YouTube Data API v3** 검색 후 **사용**  
+3. **사용자 인증 정보** → **API 키 만들기** → 생성된 키 복사 후 서버 환경 변수에 설정
 
 ## 유의사항
 
